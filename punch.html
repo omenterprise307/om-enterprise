@@ -6,15 +6,22 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
 <style>
-body{font-family:Roboto,Arial,sans-serif;background:#111;color:#fff;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;}
-.container{background:#1b1b1b;padding:30px;border-radius:12px;width:350px;text-align:center;}
+body{
+  font-family:Roboto,Arial,sans-serif;
+  background:#111;color:#fff;
+  display:flex;justify-content:center;align-items:center;
+  height:100vh;margin:0;
+}
+.container{
+  background:#1b1b1b;padding:30px;border-radius:12px;
+  width:350px;text-align:center;
+}
 h1{color:#00d4ff;margin-bottom:20px;}
-input,select{width:100%;padding:10px;margin:10px 0;border-radius:6px;border:none;font-size:14px;}
+select,input{width:100%;padding:10px;margin:10px 0;border-radius:6px;border:none;font-size:14px;}
 button{width:48%;padding:12px;margin-top:10px;border:none;border-radius:8px;font-weight:bold;cursor:pointer;transition:0.3s;}
 button.in{background:#00d4ff;color:#000;}
 button.out{background:#ff6f61;color:#fff;}
 button:hover{opacity:0.9;}
-.time-box{display:flex;gap:5px;justify-content:space-between;}
 #status{margin-top:15px;font-size:14px;color:#ffeb3b;}
 </style>
 </head>
@@ -27,18 +34,8 @@ button:hover{opacity:0.9;}
   <input type="date" id="punchDate">
 
   <div class="time-box">
-    <input type="number" id="timeIn" placeholder="IN HH:MM" step="1">
-    <select id="inMer"><option>AM</option><option>PM</option></select>
-  </div>
-
-  <div class="time-box">
-    <input type="number" id="timeOut" placeholder="OUT HH:MM" step="1">
-    <select id="outMer"><option>AM</option><option>PM</option></select>
-  </div>
-
-  <div class="time-box">
-    <button class="in" onclick="manualPunchIn()">Punch IN</button>
-    <button class="out" onclick="manualPunchOut()">Punch OUT</button>
+    <button class="in" onclick="punchIn()">Punch IN (Auto Time)</button>
+    <button class="out" onclick="punchOut()">Punch OUT (Auto Time)</button>
   </div>
 
   <div id="status"></div>
@@ -51,7 +48,6 @@ const employees = [
   {id:"104", name:"Shailesh Panchal"},
   {id:"105", name:"Nitin Panchal"}
 ];
-
 const empSelect = document.getElementById("empSelect");
 employees.forEach(e=>{
   empSelect.innerHTML += `<option value="${e.id}|${e.name}">${e.id} - ${e.name}</option>`;
@@ -68,9 +64,7 @@ request.onupgradeneeded = e=>{
   }
 };
 
-request.onsuccess = e=>{
-  db = e.target.result;
-};
+request.onsuccess = e=>{ db = e.target.result; };
 
 /* ================= HELPERS ================= */
 function getDate(){
@@ -79,32 +73,36 @@ function getDate(){
   return d;
 }
 
-function getTime(h,mer){
-  if(!h) return null;
-  let [hour,minute]=h.split(":").map(Number);
-  if(mer==="PM" && hour!=12) hour+=12;
-  if(mer==="AM" && hour==12) hour=0;
-  return `${String(hour).padStart(2,"0")}:${String(minute||0).padStart(2,"0")}:00`;
+// Format time in 12-hour AM/PM format
+function formatTime(date){
+  let h = date.getHours();
+  let m = date.getMinutes();
+  const mer = h >= 12 ? "PM" : "AM";
+  h = h % 12;
+  if(h === 0) h = 12;
+  return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")} ${mer}`;
 }
 
-/* ================= SAVE TO DB ================= */
-function saveDB(record){
-  const tx = db.transaction("attendance","readwrite");
-  tx.objectStore("attendance").put(record);
+// Convert AM/PM to 24-hour for calculations
+function timeTo24(timeStr){
+  let [hm, mer] = timeStr.split(" ");
+  let [h,m] = hm.split(":").map(Number);
+  if(mer==="PM" && h!==12) h+=12;
+  if(mer==="AM" && h===12) h=0;
+  return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:00`;
 }
 
-/* ================= MANUAL PUNCH IN ================= */
-function manualPunchIn(){
+/* ================= PUNCH IN ================= */
+function punchIn(){
   const emp = empSelect.value;
   const date = getDate();
-  const time = document.getElementById('timeIn').value;
-  const mer = document.getElementById('inMer').value;
-  if(!emp || !date || !time) return alert("Fill all fields");
+  if(!emp || !date) return alert("Select employee and date");
 
   const [id,name] = emp.split("|");
   const key = id+date;
-  const inTime = getTime(time,mer);
-  if(!inTime) return alert("Invalid IN time");
+
+  const now = new Date();
+  const inTime = formatTime(now);
 
   const tx = db.transaction("attendance","readwrite");
   const store = tx.objectStore("attendance");
@@ -118,18 +116,17 @@ function manualPunchIn(){
   };
 }
 
-/* ================= MANUAL PUNCH OUT ================= */
-function manualPunchOut(){
+/* ================= PUNCH OUT ================= */
+function punchOut(){
   const emp = empSelect.value;
   const date = getDate();
-  const time = document.getElementById('timeOut').value;
-  const mer = document.getElementById('outMer').value;
-  if(!emp || !date || !time) return alert("Fill all fields");
+  if(!emp || !date) return alert("Select employee and date");
 
   const [id,name] = emp.split("|");
   const key = id+date;
-  const outTime = getTime(time,mer);
-  if(!outTime) return alert("Invalid OUT time");
+
+  const now = new Date();
+  const outTime = formatTime(now); // AM/PM
 
   const tx = db.transaction("attendance","readwrite");
   const store = tx.objectStore("attendance");
@@ -138,13 +135,16 @@ function manualPunchOut(){
   req.onsuccess = ()=>{
     const r = req.result;
     if(!r || r.outTime!=="-") return alert("Cannot punch OUT or already punched");
-    
+
     r.outTime = outTime;
 
-    // Calculate work hours minus 1 hour recess
-    const [inH,inM] = r.inTime.split(":").map(Number);
-    const [outH,outM] = outTime.split(":").map(Number);
-    let diff = (outH + outM/60) - (inH + inM/60) - 1;
+    // Calculate work hours (24-hour conversion) minus 1 hour recess
+    const in24 = timeTo24(r.inTime);
+    const out24 = timeTo24(outTime);
+
+    const [inH,inM] = in24.split(":").map(Number);
+    const [outH,outM] = out24.split(":").map(Number);
+    let diff = (outH + outM/60) - (inH + inM/60) - 1; // minus recess
     r.workHours = diff>0?diff.toFixed(2):"0.00";
 
     store.put(r);

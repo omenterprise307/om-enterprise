@@ -5,50 +5,20 @@
 <title>OM Enterprise Attendance System</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<!-- Excel & PDF -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
-
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600&family=Roboto&display=swap" rel="stylesheet">
 
 <style>
-body{
-  font-family:Roboto;
-  background:#111;
-  color:#fff;
-  padding:20px;
-}
-.container{
-  max-width:1100px;
-  margin:auto;
-  background:#1b1b1b;
-  padding:25px;
-  border-radius:12px;
-}
-h2,h3{text-align:center;color:#00d4ff}
-select,input,button{
-  padding:10px;
-  width:100%;
-  margin-bottom:10px;
-  border-radius:6px;
-  border:none;
-}
-.time-box{display:flex;gap:5px}
-button{cursor:pointer;font-weight:bold}
-.in{background:#00d4ff}
-.out{background:#ff6f61}
-table{
-  width:100%;
-  border-collapse:collapse;
-  margin-top:15px;
-}
-th,td{
-  border:1px solid #333;
-  padding:8px;
-  text-align:center;
-}
-th{background:#00d4ff;color:#000}
+body{font-family:Roboto;background:#111;color:#fff;padding:20px;}
+.container{max-width:1100px;margin:auto;background:#1b1b1b;padding:25px;border-radius:12px;}
+h2,h3{text-align:center;color:#00d4ff;}
+select,input,button{padding:10px;width:100%;margin-bottom:10px;border-radius:6px;border:none;}
+.time-box{display:flex;gap:5px;}
+button{cursor:pointer;font-weight:bold;}
+.in{background:#00d4ff;color:#000;}
+.out{background:#ff6f61;color:#fff;}
+table{width:100%;border-collapse:collapse;margin-top:15px;}
+th,td{border:1px solid #333;padding:8px;text-align:center;}
+th{background:#00d4ff;color:#000;}
 </style>
 </head>
 
@@ -105,33 +75,34 @@ th{background:#00d4ff;color:#000}
 <script>
 /* ================= CONFIG ================= */
 const DAILY_HOURS = 8;
-const DAILY_SALARY = 500;
-const OT_RATE = 20;
 const RECESS_HOURS = 1;
 
 /* ================= EMPLOYEES ================= */
 const employees = [
-  {id:"101", name:"Ishwarbhai Patel"},
-  {id:"104", name:"Shailesh Panchal"},
-  {id:"105", name:"Nitin Panchal"}
+  {id:"101", name:"Ishwarbhai Patel", dailySalary: 500, otRate: 30},
+  {id:"104", name:"Shailesh Panchal", dailySalary: 500, otRate: 25},
+  {id:"105", name:"Nitin Panchal", dailySalary: 350, otRate: 20}
 ];
 
+/* ================= ELEMENTS ================= */
 const empSelect = document.getElementById("empSelect");
 const empFilter = document.getElementById("empFilter");
 
-empFilter.innerHTML = `<option value="">All Employees</option>`;
+empFilter.innerHTML = '<option value="">All Employees</option>';
 employees.forEach(e=>{
   empSelect.innerHTML += `<option value="${e.id}|${e.name}">${e.id} - ${e.name}</option>`;
   empFilter.innerHTML += `<option value="${e.id}">${e.name}</option>`;
 });
 
-/* ================= INDEXED DB ================= */
+/* ================= INDEXEDDB ================= */
 let db;
 const request = indexedDB.open("OM_ATTENDANCE_DB",1);
 
 request.onupgradeneeded = e=>{
   db = e.target.result;
-  db.createObjectStore("attendance",{keyPath:"key"});
+  if(!db.objectStoreNames.contains("attendance")){
+    db.createObjectStore("attendance",{keyPath:"key"});
+  }
 };
 
 request.onsuccess = e=>{
@@ -141,20 +112,21 @@ request.onsuccess = e=>{
 
 /* ================= HELPERS ================= */
 function getDate(){
-  if(!attDate.value) return alert("Select date"),null;
+  if(!attDate.value) { alert("Select date"); return null; }
   return attDate.value;
 }
 
 function getTime(h,m,mer){
-  if(!h) return null;
-  h=parseInt(h); m=parseInt(m||0);
+  if(h==="" || h===null) return null;
+  h=parseInt(h); 
+  m=parseInt(m||0);
   if(mer==="PM" && h!=12) h+=12;
   if(mer==="AM" && h==12) h=0;
   return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:00`;
 }
 
 function hoursDiff(i,o){
-  let diff=(new Date(`1970-01-01 ${o}`)-new Date(`1970-01-01 ${i}`))/3600000;
+  let diff=(new Date(`1970-01-01T${o}`)-new Date(`1970-01-01T${i}`))/3600000;
   diff -= RECESS_HOURS;
   return diff>0?diff.toFixed(2):"0.00";
 }
@@ -206,53 +178,57 @@ function markOut(){
 
 /* ================= RENDER ================= */
 function render(){
-readAll(data=>{
-  tbody.innerHTML="";
-  summaryBody.innerHTML="";
-  monthFilter.innerHTML=`<option value="">All Months</option>`;
-  const months=new Set();
-  const summary={};
+  readAll(data=>{
+    const tbody = document.getElementById("tbody");
+    const summaryBody = document.getElementById("summaryBody");
+    tbody.innerHTML="";
+    summaryBody.innerHTML="";
+    monthFilter.innerHTML='<option value="">All Months</option>';
+    const months=new Set();
+    const summary={};
 
-  employees.forEach(e=>summary[e.id]={name:e.name,h:0,ot:0,s:0,r:0});
+    employees.forEach(e=>summary[e.id]={name:e.name,h:0,ot:0,s:0,r:0,dailySalary:e.dailySalary,otRate:e.otRate});
 
-  data.forEach(r=>{
-    const m=r.date.split("-")[1];
-    months.add(m);
+    data.forEach(r=>{
+      const m=r.date.split("-")[1];
+      months.add(m);
 
-    if(empFilter.value && r.id!==empFilter.value) return;
-    if(monthFilter.value && m!==monthFilter.value) return;
+      if(empFilter.value && r.id!==empFilter.value) return;
+      if(monthFilter.value && m!==monthFilter.value) return;
 
-    const h=parseFloat(r.workHours)||0;
-    const recess=h>0?RECESS_HOURS:0;
-    const ot=h>DAILY_HOURS?h-DAILY_HOURS:0;
-    const s=h?(DAILY_SALARY+ot*OT_RATE):0;
+      const h=parseFloat(r.workHours)||0;
+      const recess=h>0?RECESS_HOURS:0;
+      const ot=h>DAILY_HOURS?h-DAILY_HOURS:0;
 
-    tbody.innerHTML+=`
-    <tr>
-      <td>${r.date}</td><td>${r.id}</td><td>${r.name}</td>
-      <td>${r.inTime}</td><td>${r.outTime}</td>
-      <td>${recess} hr</td>
-      <td>${h}</td><td>${ot}</td><td>₹${s}</td>
-    </tr>`;
+      const emp = employees.find(e => e.id === r.id);
+      const s = h ? (emp.dailySalary + ot*emp.otRate) : 0;
 
-    summary[r.id].h+=h;
-    summary[r.id].ot+=ot;
-    summary[r.id].s+=s;
-    summary[r.id].r+=recess;
+      tbody.innerHTML+=`
+      <tr>
+        <td>${r.date}</td><td>${r.id}</td><td>${r.name}</td>
+        <td>${r.inTime}</td><td>${r.outTime}</td>
+        <td>${recess} hr</td>
+        <td>${h}</td><td>${ot}</td><td>₹${s}</td>
+      </tr>`;
+
+      summary[r.id].h+=h;
+      summary[r.id].ot+=ot;
+      summary[r.id].s+=s;
+      summary[r.id].r+=recess;
+    });
+
+    [...months].sort().forEach(m=>monthFilter.innerHTML+=`<option value="${m}">${m}</option>`);
+
+    Object.keys(summary).forEach(id=>{
+      const s=summary[id];
+      summaryBody.innerHTML+=`
+      <tr>
+        <td>${id}</td><td>${s.name}</td>
+        <td>${s.r} hr</td>
+        <td>${s.h}</td><td>${s.ot}</td><td>₹${s.s}</td>
+      </tr>`;
+    });
   });
-
-  [...months].sort().forEach(m=>monthFilter.innerHTML+=`<option>${m}</option>`);
-
-  Object.keys(summary).forEach(id=>{
-    const s=summary[id];
-    summaryBody.innerHTML+=`
-    <tr>
-      <td>${id}</td><td>${s.name}</td>
-      <td>${s.r} hr</td>
-      <td>${s.h}</td><td>${s.ot}</td><td>₹${s.s}</td>
-    </tr>`;
-  });
-});
 }
 
 empFilter.onchange=render;
