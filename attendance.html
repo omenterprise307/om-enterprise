@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>OM Enterprise Attendance System</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<!-- Excel & PDF -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
+
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600&family=Roboto&display=swap" rel="stylesheet">
+
+<style>
+body{
+  font-family:Roboto;
+  background:#111;
+  color:#fff;
+  padding:20px;
+}
+.container{
+  max-width:1100px;
+  margin:auto;
+  background:#1b1b1b;
+  padding:25px;
+  border-radius:12px;
+}
+h2,h3{text-align:center;color:#00d4ff}
+select,input,button{
+  padding:10px;
+  width:100%;
+  margin-bottom:10px;
+  border-radius:6px;
+  border:none;
+}
+.time-box{display:flex;gap:5px}
+button{cursor:pointer;font-weight:bold}
+.in{background:#00d4ff}
+.out{background:#ff6f61}
+table{
+  width:100%;
+  border-collapse:collapse;
+  margin-top:15px;
+}
+th,td{
+  border:1px solid #333;
+  padding:8px;
+  text-align:center;
+}
+th{background:#00d4ff;color:#000}
+</style>
+</head>
+
+<body>
+<div class="container">
+<h2>OM Enterprise Attendance</h2>
+
+<h3>Mark Attendance</h3>
+<select id="empSelect"></select>
+<input type="date" id="attDate">
+
+<div class="time-box">
+<input type="number" id="inHour" placeholder="IN HH" min="1" max="12">
+<input type="number" id="inMin" placeholder="MM" min="0" max="59">
+<select id="inMer"><option>AM</option><option>PM</option></select>
+</div>
+
+<div class="time-box">
+<input type="number" id="outHour" placeholder="OUT HH" min="1" max="12">
+<input type="number" id="outMin" placeholder="MM" min="0" max="59">
+<select id="outMer"><option>AM</option><option>PM</option></select>
+</div>
+
+<button class="in" onclick="markIn()">MARK IN</button>
+<button class="out" onclick="markOut()">MARK OUT</button>
+
+<h3>Attendance Report</h3>
+<select id="empFilter"></select>
+<select id="monthFilter"></select>
+
+<table>
+<thead>
+<tr>
+<th>Date</th><th>ID</th><th>Name</th>
+<th>IN</th><th>OUT</th>
+<th>Recess</th><th>Hours</th><th>OT</th><th>Salary</th>
+</tr>
+</thead>
+<tbody id="tbody"></tbody>
+</table>
+
+<h3>Monthly Summary</h3>
+<table>
+<thead>
+<tr>
+<th>ID</th><th>Name</th>
+<th>Total Recess</th><th>Total Hours</th><th>OT</th><th>Salary</th>
+</tr>
+</thead>
+<tbody id="summaryBody"></tbody>
+</table>
+</div>
+
+<script>
+/* ================= CONFIG ================= */
+const DAILY_HOURS = 8;
+const DAILY_SALARY = 500;
+const OT_RATE = 20;
+const RECESS_HOURS = 1;
+
+/* ================= EMPLOYEES ================= */
+const employees = [
+  {id:"101", name:"Ishwarbhai Patel"},
+  {id:"104", name:"Shailesh Panchal"},
+  {id:"105", name:"Nitin Panchal"}
+];
+
+const empSelect = document.getElementById("empSelect");
+const empFilter = document.getElementById("empFilter");
+
+empFilter.innerHTML = `<option value="">All Employees</option>`;
+employees.forEach(e=>{
+  empSelect.innerHTML += `<option value="${e.id}|${e.name}">${e.id} - ${e.name}</option>`;
+  empFilter.innerHTML += `<option value="${e.id}">${e.name}</option>`;
+});
+
+/* ================= INDEXED DB ================= */
+let db;
+const request = indexedDB.open("OM_ATTENDANCE_DB",1);
+
+request.onupgradeneeded = e=>{
+  db = e.target.result;
+  db.createObjectStore("attendance",{keyPath:"key"});
+};
+
+request.onsuccess = e=>{
+  db = e.target.result;
+  render();
+};
+
+/* ================= HELPERS ================= */
+function getDate(){
+  if(!attDate.value) return alert("Select date"),null;
+  return attDate.value;
+}
+
+function getTime(h,m,mer){
+  if(!h) return null;
+  h=parseInt(h); m=parseInt(m||0);
+  if(mer==="PM" && h!=12) h+=12;
+  if(mer==="AM" && h==12) h=0;
+  return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}:00`;
+}
+
+function hoursDiff(i,o){
+  let diff=(new Date(`1970-01-01 ${o}`)-new Date(`1970-01-01 ${i}`))/3600000;
+  diff -= RECESS_HOURS;
+  return diff>0?diff.toFixed(2):"0.00";
+}
+
+/* ================= DB OPS ================= */
+function save(rec){
+  db.transaction("attendance","readwrite")
+    .objectStore("attendance").put(rec);
+}
+
+function readAll(cb){
+  const req=db.transaction("attendance","readonly")
+              .objectStore("attendance").getAll();
+  req.onsuccess=()=>cb(req.result);
+}
+
+/* ================= MARK IN ================= */
+function markIn(){
+  if(!empSelect.value) return alert("Select employee");
+  const [id,name]=empSelect.value.split("|");
+  const d=getDate(); if(!d) return;
+  const t=getTime(inHour.value,inMin.value,inMer.value);
+  if(!t) return alert("Enter IN time");
+
+  readAll(data=>{
+    if(data.find(r=>r.key===id+d)) return alert("Already marked");
+    save({key:id+d,id,name,date:d,inTime:t,outTime:"-",workHours:"0"});
+    render();
+  });
+}
+
+/* ================= MARK OUT ================= */
+function markOut(){
+  if(!empSelect.value) return alert("Select employee");
+  const [id]=empSelect.value.split("|");
+  const d=getDate(); if(!d) return;
+  const t=getTime(outHour.value,outMin.value,outMer.value);
+  if(!t) return alert("Enter OUT time");
+
+  readAll(data=>{
+    const r=data.find(x=>x.key===id+d);
+    if(!r || r.outTime!=="-") return alert("Invalid OUT");
+    r.outTime=t;
+    r.workHours=hoursDiff(r.inTime,t);
+    save(r);
+    render();
+  });
+}
+
+/* ================= RENDER ================= */
+function render(){
+readAll(data=>{
+  tbody.innerHTML="";
+  summaryBody.innerHTML="";
+  monthFilter.innerHTML=`<option value="">All Months</option>`;
+  const months=new Set();
+  const summary={};
+
+  employees.forEach(e=>summary[e.id]={name:e.name,h:0,ot:0,s:0,r:0});
+
+  data.forEach(r=>{
+    const m=r.date.split("-")[1];
+    months.add(m);
+
+    if(empFilter.value && r.id!==empFilter.value) return;
+    if(monthFilter.value && m!==monthFilter.value) return;
+
+    const h=parseFloat(r.workHours)||0;
+    const recess=h>0?RECESS_HOURS:0;
+    const ot=h>DAILY_HOURS?h-DAILY_HOURS:0;
+    const s=h?(DAILY_SALARY+ot*OT_RATE):0;
+
+    tbody.innerHTML+=`
+    <tr>
+      <td>${r.date}</td><td>${r.id}</td><td>${r.name}</td>
+      <td>${r.inTime}</td><td>${r.outTime}</td>
+      <td>${recess} hr</td>
+      <td>${h}</td><td>${ot}</td><td>₹${s}</td>
+    </tr>`;
+
+    summary[r.id].h+=h;
+    summary[r.id].ot+=ot;
+    summary[r.id].s+=s;
+    summary[r.id].r+=recess;
+  });
+
+  [...months].sort().forEach(m=>monthFilter.innerHTML+=`<option>${m}</option>`);
+
+  Object.keys(summary).forEach(id=>{
+    const s=summary[id];
+    summaryBody.innerHTML+=`
+    <tr>
+      <td>${id}</td><td>${s.name}</td>
+      <td>${s.r} hr</td>
+      <td>${s.h}</td><td>${s.ot}</td><td>₹${s.s}</td>
+    </tr>`;
+  });
+});
+}
+
+empFilter.onchange=render;
+monthFilter.onchange=render;
+</script>
+</body>
+</html>

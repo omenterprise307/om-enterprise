@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Manual Punch | OM Enterprise</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+<style>
+body{font-family:Roboto,Arial,sans-serif;background:#111;color:#fff;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;}
+.container{background:#1b1b1b;padding:30px;border-radius:12px;width:350px;text-align:center;}
+h1{color:#00d4ff;margin-bottom:20px;}
+input,select{width:100%;padding:10px;margin:10px 0;border-radius:6px;border:none;font-size:14px;}
+button{width:48%;padding:12px;margin-top:10px;border:none;border-radius:8px;font-weight:bold;cursor:pointer;transition:0.3s;}
+button.in{background:#00d4ff;color:#000;}
+button.out{background:#ff6f61;color:#fff;}
+button:hover{opacity:0.9;}
+.time-box{display:flex;gap:5px;justify-content:space-between;}
+#status{margin-top:15px;font-size:14px;color:#ffeb3b;}
+</style>
+</head>
+<body>
+
+<div class="container">
+  <h1>Manual Punch</h1>
+
+  <select id="empSelect"></select>
+  <input type="date" id="punchDate">
+
+  <div class="time-box">
+    <input type="number" id="timeIn" placeholder="IN HH:MM" step="1">
+    <select id="inMer"><option>AM</option><option>PM</option></select>
+  </div>
+
+  <div class="time-box">
+    <input type="number" id="timeOut" placeholder="OUT HH:MM" step="1">
+    <select id="outMer"><option>AM</option><option>PM</option></select>
+  </div>
+
+  <div class="time-box">
+    <button class="in" onclick="manualPunchIn()">Punch IN</button>
+    <button class="out" onclick="manualPunchOut()">Punch OUT</button>
+  </div>
+
+  <div id="status"></div>
+</div>
+
+<script>
+/* ================= EMPLOYEES ================= */
+const employees = [
+  {id:"101", name:"Ishwarbhai Patel"},
+  {id:"104", name:"Shailesh Panchal"},
+  {id:"105", name:"Nitin Panchal"}
+];
+
+const empSelect = document.getElementById("empSelect");
+employees.forEach(e=>{
+  empSelect.innerHTML += `<option value="${e.id}|${e.name}">${e.id} - ${e.name}</option>`;
+});
+
+/* ================= INDEXEDDB ================= */
+let db;
+const request = indexedDB.open("OM_ATTENDANCE_DB",1);
+
+request.onupgradeneeded = e=>{
+  db = e.target.result;
+  if(!db.objectStoreNames.contains("attendance")){
+    db.createObjectStore("attendance",{keyPath:"key"});
+  }
+};
+
+request.onsuccess = e=>{
+  db = e.target.result;
+};
+
+/* ================= HELPERS ================= */
+function getDate(){
+  const d = document.getElementById('punchDate').value;
+  if(!d) { alert("Select date"); return null; }
+  return d;
+}
+
+function getTime(h,mer){
+  if(!h) return null;
+  let [hour,minute]=h.split(":").map(Number);
+  if(mer==="PM" && hour!=12) hour+=12;
+  if(mer==="AM" && hour==12) hour=0;
+  return `${String(hour).padStart(2,"0")}:${String(minute||0).padStart(2,"0")}:00`;
+}
+
+/* ================= SAVE TO DB ================= */
+function saveDB(record){
+  const tx = db.transaction("attendance","readwrite");
+  tx.objectStore("attendance").put(record);
+}
+
+/* ================= MANUAL PUNCH IN ================= */
+function manualPunchIn(){
+  const emp = empSelect.value;
+  const date = getDate();
+  const time = document.getElementById('timeIn').value;
+  const mer = document.getElementById('inMer').value;
+  if(!emp || !date || !time) return alert("Fill all fields");
+
+  const [id,name] = emp.split("|");
+  const key = id+date;
+  const inTime = getTime(time,mer);
+  if(!inTime) return alert("Invalid IN time");
+
+  const tx = db.transaction("attendance","readwrite");
+  const store = tx.objectStore("attendance");
+  const req = store.get(key);
+
+  req.onsuccess = ()=>{
+    if(req.result && req.result.inTime) return alert("Already punched IN");
+    const record = {key,id,name,date,inTime,outTime:"-",workHours:"0"};
+    store.put(record);
+    document.getElementById('status').innerText = `Punch IN saved for ${name} at ${inTime}`;
+  };
+}
+
+/* ================= MANUAL PUNCH OUT ================= */
+function manualPunchOut(){
+  const emp = empSelect.value;
+  const date = getDate();
+  const time = document.getElementById('timeOut').value;
+  const mer = document.getElementById('outMer').value;
+  if(!emp || !date || !time) return alert("Fill all fields");
+
+  const [id,name] = emp.split("|");
+  const key = id+date;
+  const outTime = getTime(time,mer);
+  if(!outTime) return alert("Invalid OUT time");
+
+  const tx = db.transaction("attendance","readwrite");
+  const store = tx.objectStore("attendance");
+  const req = store.get(key);
+
+  req.onsuccess = ()=>{
+    const r = req.result;
+    if(!r || r.outTime!=="-") return alert("Cannot punch OUT or already punched");
+    
+    r.outTime = outTime;
+
+    // Calculate work hours minus 1 hour recess
+    const [inH,inM] = r.inTime.split(":").map(Number);
+    const [outH,outM] = outTime.split(":").map(Number);
+    let diff = (outH + outM/60) - (inH + inM/60) - 1;
+    r.workHours = diff>0?diff.toFixed(2):"0.00";
+
+    store.put(r);
+    document.getElementById('status').innerText = `Punch OUT saved for ${name} at ${outTime}`;
+  };
+}
+</script>
+
+</body>
+</html>

@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Login | OM Enterprise</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700&family=Roboto:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+
+body, html{
+  height:100%;
+  font-family: 'Roboto', Arial, sans-serif;
+  overflow:hidden;
+  background: url('image/background.png') no-repeat center center/cover;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  position: relative;
+}
+
+/* ===== PARTICLES ===== */
+.particles{
+  position:absolute;
+  width:100%;
+  height:100%;
+  overflow:hidden;
+  top:0;
+  left:0;
+  z-index:0;
+}
+.particle{
+  position:absolute;
+  width:8px;
+  height:8px;
+  background: rgba(255,255,255,0.3);
+  border-radius:50%;
+  animation: float 8s linear infinite;
+}
+@keyframes float{
+  0%{transform: translateY(0) translateX(0);}
+  50%{transform: translateY(-50px) translateX(30px);}
+  100%{transform: translateY(0) translateX(0);}
+}
+
+/* ===== LOGIN CARD ===== */
+.login-card{
+  width: 380px;
+  background: rgba(13, 13, 13, 0.85); /* Slightly transparent for premium glass feel */
+  backdrop-filter: blur(10px);        /* Premium glass effect */
+  border-radius: 25px;
+  padding: 50px 30px;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.8);
+  text-align: center;
+  position: relative;
+  z-index:1;
+  animation: fadeInUp 1s ease forwards;
+  opacity: 0;
+  border: 1px solid rgba(255,255,255,0.1);
+  perspective: 1000px;
+  transform-style: preserve-3d;
+  transition: transform 0.2s ease;
+}
+.login-card::before{
+  content:'';
+  position:absolute;
+  top:-2px; left:-2px; right:-2px; bottom:-2px;
+  border-radius:25px;
+  background: linear-gradient(270deg,#ff4d4d,#3498db,#1e88e5,#00d4ff);
+  z-index:-1;
+  filter: blur(8px);
+  animation: borderGlow 4s linear infinite;
+  background-size: 400% 400%;
+}
+@keyframes borderGlow{
+  0%{background-position:0% 50%;}
+  50%{background-position:100% 50%;}
+  100%{background-position:0% 50%;}
+}
+
+/* Floating Icon - FIXED SECTION */
+.login-card .icon{
+  font-size: 50px;
+  background: linear-gradient(135deg,#ff4d4d,#00d4ff);
+  -webkit-background-clip: text;
+  background-clip: text;           /* Added standard property to fix error */
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 20px;
+  animation: iconBounce 2s infinite;
+}
+@keyframes iconBounce{
+  0%,100%{transform: translateY(0);}
+  50%{transform: translateY(-10px);}
+}
+
+/* Fade in animation */
+@keyframes fadeInUp{
+  from{opacity:0; transform: translateY(30px);}
+  to{opacity:1; transform: translateY(0);}
+}
+
+/* Title */
+.login-card h2{
+  font-family: 'Poppins', sans-serif;
+  font-size: 32px;
+  font-weight: 700;
+  margin-bottom:30px;
+  color: #fff;
+  letter-spacing: 1px;
+}
+
+/* Input Fields */
+.form-group{
+  position: relative;
+  margin-bottom:25px;
+}
+.form-group input{
+  width:100%;
+  padding:14px 12px;
+  border-radius:12px;
+  border:1px solid rgba(255,255,255,0.2);
+  background: rgba(26, 26, 26, 0.6);
+  color: #fff;
+  font-size:14px;
+  font-family: 'Roboto', sans-serif;
+  transition:0.3s;
+}
+.form-group input:focus{
+  outline:none;
+  border-color:#00d4ff;
+  background: rgba(34, 34, 34, 0.9);
+  box-shadow: 0 0 15px rgba(0, 212, 255, 0.2);
+}
+
+/* Floating Labels */
+.form-group label{
+  position:absolute;
+  top:50%;
+  left:12px;
+  transform: translateY(-50%);
+  pointer-events:none;
+  color: rgba(255,255,255,0.6);
+  font-weight:500;
+  transition:0.3s;
+}
+.form-group input:focus + label,
+.form-group input:not(:placeholder-shown) + label{
+  top:-10px;
+  font-size:12px;
+  font-weight:600;
+  color:#00d4ff;
+  background: #0d0d0d;
+  border-radius:4px;
+  padding:0 5px;
+}
+
+/* Login Button */
+.login-btn{
+  width:100%;
+  padding:14px;
+  border:none;
+  border-radius:14px;
+  font-size:16px;
+  font-weight:600;
+  color:#fff;
+  cursor:pointer;
+  background: linear-gradient(270deg,#00d4ff,#3498db,#1e88e5);
+  background-size: 400% 400%;
+  animation: gradientBG 5s ease infinite;
+  transition:0.3s;
+}
+.login-btn:hover{
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 0 10px 25px rgba(0, 212, 255, 0.4);
+}
+@keyframes gradientBG{
+  0%{background-position:0% 50%;}
+  50%{background-position:100% 50%;}
+  100%{background-position:0% 50%;}
+}
+
+/* Extra Links */
+.extra-links{
+  margin-top:15px;
+  font-size:14px;
+  display: flex;
+  justify-content: space-between;
+}
+.extra-links a{
+  color:rgba(255,255,255,0.7);
+  text-decoration:none;
+  font-weight:500;
+  transition: 0.3s;
+}
+.extra-links a:hover{
+  color:#00d4ff;
+}
+
+/* Responsive */
+@media(max-width:480px){
+  .login-card{
+    width:90%;
+    padding:40px 20px;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<div class="particles" id="particles"></div>
+
+<div class="login-card" id="loginCard">
+  <div class="icon"><i class="fa fa-user-circle"></i></div>
+  <h2>OM Enterprise</h2>
+  <form onsubmit="checkLogin(event)">
+    <div class="form-group">
+      <input type="email" id="email" placeholder=" " required>
+      <label>Email</label>
+    </div>
+
+    <div class="form-group">
+      <input type="password" id="password" placeholder=" " required>
+      <label>Password</label>
+    </div>
+
+    <button type="submit" class="login-btn">Login</button>
+  </form>
+
+  <div class="extra-links">
+    <a href="#">Forgot Password?</a>
+    <a href="#">Sign Up</a>
+  </div>
+</div>
+
+<script>
+// Login function
+function checkLogin(event){
+  event.preventDefault();
+  const email=document.getElementById("email").value;
+  const password=document.getElementById("password").value;
+  if(email==="dharvikpatidar@gmail.com" && password==="123456"){
+    localStorage.setItem("loggedIn","true");
+    window.location.href="index.html";
+  } else {
+    alert("Invalid Email or Password");
+  }
+}
+
+// Generate floating particles
+const particlesContainer = document.getElementById('particles');
+for(let i=0;i<40;i++){
+  const p = document.createElement('div');
+  p.classList.add('particle');
+  p.style.left = Math.random()*100 + 'vw';
+  p.style.top = Math.random()*100 + 'vh';
+  p.style.width = (Math.random()*6 + 4) + 'px';
+  p.style.height = p.style.width;
+  p.style.animationDuration = (Math.random()*5 + 5) + 's';
+  p.style.opacity = Math.random()*0.5 + 0.2;
+  particlesContainer.appendChild(p);
+}
+
+// Tilt effect
+const card = document.getElementById('loginCard');
+card.addEventListener('mousemove', (e)=>{
+  const rect = card.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  const cx = rect.width/2;
+  const cy = rect.height/2;
+  const dx = (x - cx)/cx;
+  const dy = (y - cy)/cy;
+  card.style.transform = `rotateY(${dx*8}deg) rotateX(${-dy*8}deg)`;
+});
+card.addEventListener('mouseleave', ()=>{
+  card.style.transform = 'rotateY(0deg) rotateX(0deg)';
+});
+</script>
+
+</body>
+</html>
